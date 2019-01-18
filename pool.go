@@ -2,6 +2,7 @@ package gopool
 
 import (
 	"sync"
+	"time"
 )
 
 type Task func()
@@ -11,6 +12,8 @@ type Pool struct {
 	taskRecvQueue chan Task    //接收任务队列
 	stop          chan int
 	wg            *sync.WaitGroup
+	poolSize      int
+	workerPool    []*worker
 }
 
 type worker struct {
@@ -57,18 +60,22 @@ func (w *worker) close() {
 // wgSize WaitGroup大小，为0时不等待
 func New(poolSize int) *Pool {
 	p := &Pool{
-		poolChan:      make(chan *worker, poolSize),
+		poolChan:      make(chan *worker, poolSize), //存放空闲的工作协程
 		taskRecvQueue: make(chan Task, poolSize),
 		stop:          make(chan int),
 		wg:            &sync.WaitGroup{}, //等待任务结束
+		poolSize:      poolSize,
+		workerPool:    []*worker{}, //存放工作协程
 	}
 	go p.dispatch()
 
-	//新建workers
-	for i := 0; i < poolSize; i++ {
-		w := newWorker(p)
-		go w.run()
-	}
+	////新建workers
+	//for i := 0; i < poolSize; i++ {
+	//	w := newWorker(p)
+	//	go w.run()
+	//}
+	go p.manage()
+	
 	return p
 }
 
@@ -116,6 +123,44 @@ func (p *Pool) dispatch() {
 		}
 
 	}
+}
+
+func (p *Pool) manage() {
+	//init
+	if len(p.workerPool) == 0 {
+
+		for i := 0; i < p.poolSize; i++ {
+			w := newWorker(p)
+			go w.run()
+		}
+	}
+
+	tick := time.NewTicker(time.Second)
+	//resize
+	for {
+		select {
+		case <-tick.C:
+			if len(p.workerPool) == p.poolSize {
+
+			} else if len(p.workerPool) > p.poolSize {
+				// contract
+				idleWork := p.getWorker()
+				idleWork.close()
+
+			} else {
+				// expand
+
+				w := newWorker(p)
+				go w.run()
+
+			}
+		case <-p.stop:
+			return
+		}
+	}
+
+	return
+
 }
 
 //获取空闲worker
