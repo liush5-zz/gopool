@@ -6,7 +6,7 @@ import (
 )
 
 func TestPool_Submit(t *testing.T) {
-	pool := New(5)
+	pool := New(2)
 	start := time.Now()
 	t.Log("start at", start.String())
 	pool.Submit(func() {
