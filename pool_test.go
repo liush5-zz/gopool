@@ -8,22 +8,17 @@ import (
 func TestPool_Submit(t *testing.T) {
 	pool := New(2)
 	start := time.Now()
+
 	t.Log("start at", start.String())
-	pool.Submit(func() {
-		time.Sleep(time.Second)
-	})
-	pool.Submit(func() {
-		time.Sleep(time.Second)
-	})
-	pool.Submit(func() {
-		time.Sleep(time.Second)
-	})
-	pool.Submit(func() {
-		time.Sleep(time.Second)
-	})
-	pool.Submit(func() {
-		time.Sleep(time.Second)
-	})
+
+	taskNum := 5
+	for i := 0; i < taskNum; i++ {
+		pool.Submit(func() {
+			t.Log("线程池大小", pool.GetSize())
+			time.Sleep(time.Second)
+		})
+	}
+
 	pool.Wait()
 	if time.Since(start) < time.Second {
 		t.Error("协程池未阻塞")
