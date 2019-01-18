@@ -27,9 +27,15 @@ func New(poolSize int) *Pool {
 
 // 提交任务
 func (p *Pool) Submit(task Task) {
-	p.ch <- struct{}{}
+	p.ch <- struct{}{} //若pool满了，阻塞直到有空闲，开启新的worker 协程
 
-	p.taskRecvQueue <- task
+	p.wg.Add(1)
+	taskWrap := func() {
+		task()
+		p.wg.Done()
+	}
+
+	p.taskRecvQueue <- taskWrap
 
 }
 
@@ -42,11 +48,11 @@ func (p *Pool) dispatch() {
 
 			//worker := <-p.workerPool //从工作池中取出一个worker，处理任务
 			//worker.jobQueue <- job
-			p.wg.Add(1)
+
+			//p.wg.Add(1)
 			go func() {
 				defer func() {
-					p.wg.Done()
-					<-p.ch
+					<-p.ch //结束工作线程
 				}()
 				task()
 			}()
@@ -70,6 +76,6 @@ func (p *Pool) Wait() {
 	p.wg.Wait()
 }
 
-/*func (p *Pool) Exit() {
+func (p *Pool) Exit() {
 	close(p.stop)
-}*/
+}
