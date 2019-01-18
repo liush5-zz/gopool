@@ -69,10 +69,6 @@ func New(poolSize int) *Pool {
 		w := newWorker(p)
 		go w.run()
 	}
-
-	//time.Sleep(time.Second)
-	//log.Println(p.GetSize())
-
 	return p
 }
 

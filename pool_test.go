@@ -6,7 +6,7 @@ import (
 )
 
 func TestPool_Submit(t *testing.T) {
-	pool := New(2)
+	pool := New(4)
 	start := time.Now()
 
 	t.Log("start at", start.String())
@@ -14,7 +14,6 @@ func TestPool_Submit(t *testing.T) {
 	taskNum := 5
 	for i := 0; i < taskNum; i++ {
 		pool.Submit(func() {
-			t.Log("线程池大小", pool.GetSize())
 			time.Sleep(time.Second)
 		})
 	}
