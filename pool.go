@@ -2,6 +2,8 @@ package gopool
 
 import "sync"
 
+type Task func()
+
 type Pool struct {
 	ch chan struct{} //控制协程池大小，
 	wg *sync.WaitGroup
@@ -20,8 +22,9 @@ func New(poolSize int) *Pool {
 }
 
 // 提交任务
-func (p *Pool) Submit(task func()) {
+func (p *Pool) Submit(task Task) {
 	p.ch <- struct{}{}
+
 	p.wg.Add(1)
 	go func() {
 		defer func() {
