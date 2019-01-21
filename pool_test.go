@@ -7,6 +7,8 @@ import (
 
 func TestPool_Submit(t *testing.T) {
 	pool := New(4)
+	defer pool.Exit()
+
 	start := time.Now()
 
 	t.Log("start at", start.String())

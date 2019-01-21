@@ -13,7 +13,8 @@ type Pool struct {
 	stop          chan int
 	wg            *sync.WaitGroup
 	poolSize      int
-	workerPool    []*worker
+	mux           sync.Mutex
+	workerPool    map[*worker]bool
 }
 
 type worker struct {
@@ -23,11 +24,17 @@ type worker struct {
 }
 
 func newWorker(p *Pool) *worker {
-	return &worker{
+	w := &worker{
 		pool:      p,
 		taskQueue: make(chan Task),
 		stop:      make(chan int),
 	}
+
+	//在工作池中注册
+	p.mux.Lock()
+	p.workerPool[w] = true
+	p.mux.Unlock()
+	return w
 }
 
 func (w *worker) run() {
@@ -37,9 +44,15 @@ func (w *worker) run() {
 		select {
 		case task := <-w.taskQueue:
 			task()
-
 			//任务结束，worker 空闲
+
 		case <-w.stop:
+
+			//在工作池中注销
+			w.pool.mux.Lock()
+			delete(w.pool.workerPool, w)
+			w.pool.mux.Unlock()
+
 			return
 		}
 
@@ -57,7 +70,6 @@ func (w *worker) close() {
 
 // 实例化
 // poolSize 协程池大小
-// wgSize WaitGroup大小，为0时不等待
 func New(poolSize int) *Pool {
 	p := &Pool{
 		poolChan:      make(chan *worker, poolSize), //存放空闲的工作协程
@@ -65,23 +77,18 @@ func New(poolSize int) *Pool {
 		stop:          make(chan int),
 		wg:            &sync.WaitGroup{}, //等待任务结束
 		poolSize:      poolSize,
-		workerPool:    []*worker{}, //存放工作协程
+		mux:           sync.Mutex{},
+		workerPool:    make(map[*worker]bool), //存放工作协程
 	}
-	go p.dispatch()
 
-	////新建workers
-	//for i := 0; i < poolSize; i++ {
-	//	w := newWorker(p)
-	//	go w.run()
-	//}
+	go p.dispatch()
 	go p.manage()
-	
+
 	return p
 }
 
 // 提交任务
 func (p *Pool) Submit(task Task) {
-	//p.ch <- struct{}{} //若pool满了，阻塞直到有空闲，开启新的worker 协程
 
 	p.wg.Add(1)
 	taskWrap := func() {
@@ -97,28 +104,13 @@ func (p *Pool) Submit(task Task) {
 func (p *Pool) dispatch() {
 
 	for {
-
 		select {
 		case task := <-p.taskRecvQueue: //取出任务
 
 			idleWorker := p.getWorker() //从工作池中取出一个空闲的worker，处理任务
 			idleWorker.submit(task)
 
-			//go func() {
-			//	defer func() {
-			//		//<-p.ch //结束工作线程
-			//	}()
-			//	task()
-			//}()
-
-
 		case <-p.stop: //结束信号
-			//for i := 0; i < cap(p.workerPool); i++ { //结束工作池中所有的工作协程
-			//
-			//	worker := <-p.workerPool
-			//	close(worker.stop)
-			//}
-
 			return
 		}
 
@@ -135,26 +127,28 @@ func (p *Pool) manage() {
 		}
 	}
 
-	tick := time.NewTicker(time.Second)
 	//resize
+	tick := time.NewTicker(time.Second)
 	for {
 		select {
 		case <-tick.C:
 			if len(p.workerPool) == p.poolSize {
 
 			} else if len(p.workerPool) > p.poolSize {
-				// contract
+				// reduce
 				idleWork := p.getWorker()
 				idleWork.close()
 
 			} else {
 				// expand
-
 				w := newWorker(p)
 				go w.run()
 
 			}
 		case <-p.stop:
+			for w := range p.workerPool { //结束工作池中所有的工作协程
+				w.close()
+			}
 			return
 		}
 	}
