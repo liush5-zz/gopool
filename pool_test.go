@@ -2,14 +2,22 @@ package gopool
 
 import (
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
+
 const (
 	_   = 1 << (10 * iota)
-	KiB // 1024
-	MiB // 1048576
+	KiB  // 1024
+	MiB  // 1048576
 )
+
+const (
+	poolSize = 10000
+	n        = 100000
+)
+
 var curMem uint64
 
 func demoFunc() {
@@ -17,33 +25,44 @@ func demoFunc() {
 	time.Sleep(time.Duration(n) * time.Millisecond)
 }
 
-func TestPool_Submit(t *testing.T) {
-	pool := New(400)
-	defer time.Sleep(time.Second*5)
+func TestPool(t *testing.T) {
+	pool := New(poolSize)
 	defer pool.Exit()
 
 	start := time.Now()
 
 	t.Log("start at", start.String())
 
-	taskNum := 100000
-	for i := 0; i < taskNum; i++ {
+	for i := 0; i < n; i++ {
 		pool.Submit(demoFunc)
 	}
 
 	pool.Wait()
-	if time.Since(start) < time.Second {
-		t.Error("协程池未阻塞")
-		return
-	}
+
 	t.Log("finish at", time.Now().String())
 	t.Logf("pool, capacity:%d", pool.poolSize)
 	t.Logf("pool, running workers number:%d", len(pool.workerPool))
 	t.Logf("pool, free workers number:%d", len(pool.poolChan))
 	mem := runtime.MemStats{}
 	runtime.ReadMemStats(&mem)
-	curMem := mem.TotalAlloc/MiB - curMem
+	curMem := mem.TotalAlloc/MiB
 	t.Logf("memory usage:%d MB", curMem)
 
 }
 
+func TestNoPool(t *testing.T) {
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			demoFunc()
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	mem := runtime.MemStats{}
+	runtime.ReadMemStats(&mem)
+	curMem = mem.TotalAlloc/MiB
+	t.Logf("memory usage:%d MB", curMem)
+}

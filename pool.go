@@ -2,6 +2,7 @@ package gopool
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -12,7 +13,7 @@ type Pool struct {
 	taskRecvQueue chan Task    //接收任务队列
 	stop          chan int
 	wg            *sync.WaitGroup
-	poolSize      int
+	poolSize      int64
 	mux           sync.Mutex
 	workerPool    map[*worker]bool
 }
@@ -70,7 +71,7 @@ func (w *worker) close() {
 
 // 实例化
 // poolSize 协程池大小
-func New(poolSize int) *Pool {
+func New(poolSize int64) *Pool {
 	p := &Pool{
 		poolChan:      make(chan *worker, poolSize), //存放空闲的工作协程
 		taskRecvQueue: make(chan Task, poolSize),
@@ -122,7 +123,7 @@ func (p *Pool) manage() {
 	//init
 	if len(p.workerPool) == 0 {
 
-		for i := 0; i < p.poolSize; i++ {
+		for i := int64(0); i < p.poolSize; i++ {
 			w := newWorker(p)
 			go w.run()
 		}
@@ -133,9 +134,10 @@ func (p *Pool) manage() {
 	for {
 		select {
 		case <-tick.C:
-			if len(p.workerPool) == p.poolSize {
+			currentSize := int64(len(p.workerPool))
+			if currentSize == p.poolSize {
 
-			} else if len(p.workerPool) > p.poolSize {
+			} else if currentSize > p.poolSize {
 				// reduce
 				idleWork := p.getWorker()
 				idleWork.close()
@@ -159,6 +161,11 @@ func (p *Pool) manage() {
 
 	return
 
+}
+
+func (p *Pool) Resize(newSize int64) {
+	atomic.SwapInt64(&p.poolSize, newSize)
+	return
 }
 
 //获取空闲worker
