@@ -6,17 +6,17 @@ import (
 )
 
 func TestPool_Submit(t *testing.T) {
-	pool := New(4)
+	pool := New(400)
 	defer pool.Exit()
 
 	start := time.Now()
 
 	t.Log("start at", start.String())
 
-	taskNum := 5
+	taskNum := 500000
 	for i := 0; i < taskNum; i++ {
 		pool.Submit(func() {
-			time.Sleep(time.Second)
+			time.Sleep(time.Millisecond)
 		})
 	}
 

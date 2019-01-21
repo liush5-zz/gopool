@@ -107,7 +107,8 @@ func (p *Pool) dispatch() {
 		select {
 		case task := <-p.taskRecvQueue: //取出任务
 
-			idleWorker := p.getWorker() //从工作池中取出一个空闲的worker，处理任务
+			//从工作池中取出一个空闲的worker，处理任务
+			idleWorker := p.getWorker()
 			idleWorker.submit(task)
 
 		case <-p.stop: //结束信号
