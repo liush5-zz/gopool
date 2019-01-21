@@ -65,7 +65,7 @@ func (w *worker) submit(task Task) {
 }
 
 func (w *worker) close() {
-	w.stop <- 1
+	close(w.stop)
 }
 
 // 实例化
@@ -147,9 +147,12 @@ func (p *Pool) manage() {
 
 			}
 		case <-p.stop:
+			p.mux.Lock()
 			for w := range p.workerPool { //结束工作池中所有的工作协程
 				w.close()
 			}
+			p.mux.Unlock()
+
 			return
 		}
 	}
