@@ -15,7 +15,7 @@ const (
 
 const (
 	poolSize = 10000
-	n        = 100000
+	n        = 1000000
 )
 
 var curMem uint64

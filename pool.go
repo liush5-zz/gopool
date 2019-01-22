@@ -27,7 +27,7 @@ type worker struct {
 func newWorker(p *Pool) *worker {
 	w := &worker{
 		pool:      p,
-		taskQueue: make(chan Task),
+		taskQueue: make(chan Task, 1),
 		stop:      make(chan int),
 	}
 
@@ -164,7 +164,7 @@ func (p *Pool) manage() {
 }
 
 func (p *Pool) Resize(newSize int64) {
-	atomic.SwapInt64(&p.poolSize, newSize)
+	atomic.StoreInt64(&p.poolSize, newSize)
 	return
 }
 
