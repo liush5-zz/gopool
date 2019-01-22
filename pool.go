@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+const (
+	DefaultSize = 10
+)
+
 type Task func()
 
 type Pool struct {
@@ -72,6 +76,9 @@ func (w *worker) close() {
 // 实例化
 // poolSize 协程池大小
 func New(poolSize int64) *Pool {
+	if poolSize <= 0 {
+		poolSize = DefaultSize
+	}
 	p := &Pool{
 		poolChan:      make(chan *worker, poolSize), //存放空闲的工作协程
 		taskRecvQueue: make(chan Task, poolSize),
