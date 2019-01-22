@@ -40,7 +40,7 @@ func TestPool(t *testing.T) {
 	pool.Wait()
 
 	t.Log("finish at", time.Now().String())
-	t.Logf("pool, capacity:%d", pool.poolSize)
+	t.Logf("pool, capacity:%d", pool.Size())
 	t.Logf("pool, running workers number:%d", len(pool.workerPool))
 	t.Logf("pool, free workers number:%d", len(pool.poolChan))
 	mem := runtime.MemStats{}

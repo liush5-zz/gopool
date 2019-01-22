@@ -13,13 +13,13 @@ const (
 type Task func()
 
 type Pool struct {
-	poolChan      chan *worker //pool的工作池
-	taskRecvQueue chan Task    //接收任务队列
-	stop          chan int
-	wg            *sync.WaitGroup
-	poolSize      int64
-	mux           sync.Mutex
-	workerPool    map[*worker]bool
+	poolChan      chan *worker     //存储空闲的worker
+	taskRecvQueue chan Task        //接收任务队列
+	stop          chan int         //结束信号
+	wg            *sync.WaitGroup  //用于等待任务结束
+	poolSize      int64            //工作池大小
+	mux           sync.Mutex       //锁
+	workerPool    map[*worker]bool //储存所有的worker
 }
 
 type worker struct {
@@ -44,7 +44,7 @@ func newWorker(p *Pool) *worker {
 
 func (w *worker) run() {
 	for {
-		w.pool.poolChan <- w //将空闲的worker 放回池中
+		w.pool.poolChan <- w //将空闲的worker重新放回工作池
 
 		select {
 		case task := <-w.taskQueue:
@@ -73,8 +73,7 @@ func (w *worker) close() {
 	close(w.stop)
 }
 
-// 实例化
-// poolSize 协程池大小
+// 实例化协程池
 func New(poolSize int64) *Pool {
 	if poolSize <= 0 {
 		poolSize = DefaultSize
@@ -130,7 +129,7 @@ func (p *Pool) manage() {
 	//init
 	if len(p.workerPool) == 0 {
 
-		for i := int64(0); i < p.poolSize; i++ {
+		for i := int64(0); i < p.Size(); i++ {
 			w := newWorker(p)
 			go w.run()
 		}
@@ -141,10 +140,10 @@ func (p *Pool) manage() {
 	for {
 		select {
 		case <-tick.C:
-			currentSize := int64(len(p.workerPool))
-			if currentSize == p.poolSize {
+			isRuning := int64(len(p.workerPool))
+			if isRuning == p.Size() {
 
-			} else if currentSize > p.poolSize {
+			} else if isRuning > p.Size() {
 				// reduce
 				idleWork := p.getWorker()
 				idleWork.close()
@@ -175,13 +174,14 @@ func (p *Pool) Resize(newSize int64) {
 	return
 }
 
+func (p *Pool) Size() int64 {
+	return atomic.LoadInt64(&p.poolSize)
+}
+
 //获取空闲worker
 func (p *Pool) getWorker() *worker {
 	worker := <-p.poolChan
 	return worker
-}
-func (p *Pool) GetSize() int {
-	return len(p.poolChan)
 }
 
 // 等待WaitGroup执行完毕
